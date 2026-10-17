@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Notes App</title></head>
+<body style="font-family:Arial;max-width:500px;margin:50px auto">
+  <h1>Meri Notes App</h1>
+  <input id="text" placeholder="Note likho">
+  <button onclick="addNote()">Add</button>
+  <ul id="list"></ul>
+
+  <script>
+    async function load() {
+      const res = await fetch('/api/notes');
+      const notes = await res.json();
+      document.getElementById('list').innerHTML =
+        notes.map(n => `<li>${n.text}</li>`).join('');
+    }
+    async function addNote() {
+      const text = document.getElementById('text').value;
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ text })
+      });
+      document.getElementById('text').value = '';
+      load();
+    }
+    load();
+  </script>
+</body>
+</html>
