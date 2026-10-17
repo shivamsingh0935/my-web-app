@@ -1,30 +1,378 @@
 <!DOCTYPE html>
-<html>
-<head><title>Notes App</title></head>
-<body style="font-family:Arial;max-width:500px;margin:50px auto">
-  <h1>My Live Notes Apps</h1>
-  <input id="text" placeholder="Note likho">
-  <button onclick="addNote()">Add</button>
-  <ul id="list"></ul>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind Notes - Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f4f7; --surface:#ffffff; --surface-2:#f8f9fb; --line:#e3e6ec;
+  --ink:#151a24; --muted:#697386; --brand:#1d3557; --brand-ink:#ffffff;
+  --accent:#0b7a75; --accent-soft:#dff3f1; --ok:#12805c; --warn:#b45309; --bad:#b42318;
+  --bad-soft:#fde8e6; --ok-soft:#dcf5ea;
+  --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0e1218; --surface:#161c26; --surface-2:#1b2230; --line:#262f3f;
+    --ink:#e8ecf3; --muted:#92a0b6; --brand:#0a0f17; --accent:#37b5ae; --accent-soft:#12312f;
+    --ok:#4cc79b; --ok-soft:#10301f; --warn:#e3a24a; --bad:#f2827a; --bad-soft:#3a1a18;
+  }
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-  <script>
-    async function load() {
-      const res = await fetch('/api/notes');
-      const notes = await res.json();
-      document.getElementById('list').innerHTML =
-        notes.map(n => `<li>${n.text}</li>`).join('');
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100%}
+
+/* Sidebar */
+.side{background:var(--brand);color:#dbe3ef;padding:20px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.logo{display:flex;align-items:center;gap:10px;padding:0 8px;color:#fff;font-weight:600;font-size:16px;letter-spacing:.2px}
+.logo i{width:28px;height:28px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+.logo svg{width:16px;height:16px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;background:none;border:0;padding:9px 10px;border-radius:8px;color:#b8c4d6;cursor:pointer;text-align:left}
+.nav button svg{width:17px;height:17px;flex:none}
+.nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav button[aria-current="page"]{background:rgba(255,255,255,.12);color:#fff;font-weight:500}
+.side-foot{margin-top:auto;padding:12px;border-radius:10px;background:rgba(255,255,255,.07);font-size:12px;color:#b8c4d6}
+.side-foot b{display:block;color:#fff;font-weight:500;margin-bottom:2px}
+
+/* Main */
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:16px;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top h1{font-size:18px;font-weight:600;margin-right:auto}
+.search{position:relative;width:280px;max-width:40vw}
+.search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.search svg{position:absolute;left:10px;top:9px;width:16px;height:16px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:500;background:var(--surface-2);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}.pill.ok .dot{background:var(--ok)}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}.pill.bad .dot{background:var(--bad)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:600;font-size:13px}
+
+.content{padding:24px 28px 40px;display:flex;flex-direction:column;gap:20px;max-width:1280px;width:100%}
+.view[hidden]{display:none}
+.view{display:flex;flex-direction:column;gap:20px}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.kpi span{color:var(--muted);font-size:13px}
+.kpi strong{display:block;font-size:28px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--muted);font-size:12px}
+
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-h h2{font-size:15px;font-weight:600}
+.card-b{padding:16px 18px}
+
+/* Add form */
+.add{display:flex;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.add input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.btn{background:var(--accent);color:#fff;border:0;padding:10px 16px;border-radius:8px;font-weight:500;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.6;cursor:wait}
+.btn.ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);padding:6px 12px;font-size:13px}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-weight:500;color:var(--muted);font-size:12.5px;padding:10px 18px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.tbl td{padding:12px 18px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .id{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.tbl .when{color:var(--muted);white-space:nowrap}
+.empty{padding:34px 18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);margin-bottom:4px}
+.tbl-wrap{overflow-x:auto}
+
+/* Chart */
+.bars{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:8px}
+.bar{flex:1;background:var(--accent-soft);border-radius:4px 4px 0 0;position:relative;min-height:3px}
+.bar.on{background:var(--accent)}
+.bar-labels{display:flex;gap:6px;margin-top:6px;color:var(--muted);font-size:11px}
+.bar-labels span{flex:1;text-align:center}
+
+/* System list */
+.rows{display:flex;flex-direction:column}
+.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row span{color:var(--muted)}
+.row b{font-weight:500;text-align:right;word-break:break-all}
+.mono{font-family:var(--mono);font-size:12.5px}
+
+.log{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px;max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.log .ok{color:var(--ok)}.log .bad{color:var(--bad)}
+
+.toast{position:fixed;right:20px;bottom:20px;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:8px;font-weight:500;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+
+@media (max-width:1000px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;padding:10px 12px;gap:10px;overflow-x:auto}
+  .nav{flex-direction:row}
+  .nav button span{display:none}
+  .side-foot,.logo b{display:none}
+  .top{padding:12px 16px;flex-wrap:wrap}
+  .search{order:5;width:100%;max-width:none}
+  .content{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="logo">
+      <i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M9 11h6M9 15h6"/></svg></i>
+      <b>Northwind Notes</b>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <button data-view="dashboard" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span>Dashboard</span></button>
+      <button data-view="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>All notes</span></button>
+      <button data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/></svg><span>System status</span></button>
+    </nav>
+    <div class="side-foot"><b>Hosted on AWS</b>Nginx, Node.js, systemd</div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <h1 id="title">Dashboard</h1>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Search notes" aria-label="Search notes">
+      </div>
+      <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">Checking server</span></span>
+      <div class="avatar" title="Admin">A</div>
+    </header>
+
+    <main class="content">
+
+      <!-- DASHBOARD -->
+      <section class="view" id="v-dashboard">
+        <div class="kpis">
+          <div class="kpi"><span>Server</span><strong id="kStatus">-</strong><small id="kStatusSub">Checking</small></div>
+          <div class="kpi"><span>Total notes</span><strong id="kTotal">0</strong><small>Since last restart</small></div>
+          <div class="kpi"><span>Added today</span><strong id="kToday">0</strong><small id="kLast">No notes yet</small></div>
+          <div class="kpi"><span>Response time</span><strong id="kLatency">-</strong><small>Health check</small></div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-h"><h2>Quick add</h2></div>
+            <form class="add" id="addForm">
+              <input id="text" type="text" placeholder="Write a note" maxlength="200" aria-label="New note" required>
+              <button class="btn" id="addBtn" type="submit">Add note</button>
+            </form>
+            <div class="card-h" style="border-top:0"><h2>Recent notes</h2><button class="btn ghost" data-view="notes" type="button">View all</button></div>
+            <div class="tbl-wrap"><table class="tbl"><tbody id="recent"></tbody></table></div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="card">
+              <div class="card-h"><h2>Notes added, last 8 hours</h2></div>
+              <div class="card-b">
+                <div class="bars" id="bars"></div>
+                <div class="bar-labels" id="barLabels"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h2>Service health</h2></div>
+              <div class="card-b rows">
+                <div class="row"><span>API</span><b id="hApi">-</b></div>
+                <div class="row"><span>Last checked</span><b id="hTime">-</b></div>
+                <div class="row"><span>Server time</span><b id="hSrv" class="mono">-</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="view" id="v-notes" hidden>
+        <div class="card">
+          <div class="card-h"><h2>All notes</h2><span class="pill" id="count">0 notes</span></div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Note</th><th>Added</th><th>ID</th></tr></thead>
+              <tbody id="all"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SYSTEM -->
+      <section class="view" id="v-system" hidden>
+        <div class="grid">
+          <div class="card">
+            <div class="card-h"><h2>Deployment</h2></div>
+            <div class="card-b rows">
+              <div class="row"><span>Address</span><b class="mono" id="sHost">-</b></div>
+              <div class="row"><span>Protocol</span><b id="sProto">-</b></div>
+              <div class="row"><span>Web server</span><b>Nginx (reverse proxy, port 80)</b></div>
+              <div class="row"><span>Application</span><b>Node.js and Express (port 3000)</b></div>
+              <div class="row"><span>Process manager</span><b>systemd, restarts on failure</b></div>
+              <div class="row"><span>Cloud</span><b>AWS EC2, Ubuntu</b></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Health check log</h2><button class="btn ghost" id="recheck" type="button">Check now</button></div>
+            <div class="card-b"><div class="log" id="log"></div></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  var notes = [];
+  var $ = function(id){ return document.getElementById(id); };
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function ago(ts){
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 10) return 'Just now';
+    if (s < 60) return s + ' sec ago';
+    if (s < 3600) return Math.floor(s/60) + ' min ago';
+    if (s < 86400) return Math.floor(s/3600) + ' hr ago';
+    return new Date(ts).toLocaleDateString();
+  }
+  function clock(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
+  function toast(msg){
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  /* Navigation */
+  var titles = {dashboard:'Dashboard', notes:'All notes', system:'System status'};
+  function show(view){
+    ['dashboard','notes','system'].forEach(function(v){ $('v-'+v).hidden = (v !== view); });
+    document.querySelectorAll('.nav button').forEach(function(b){
+      if (b.dataset.view === view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    });
+    $('title').textContent = titles[view];
+  }
+  document.querySelectorAll('[data-view]').forEach(function(b){
+    b.addEventListener('click', function(){ show(b.dataset.view); });
+  });
+
+  /* Rendering */
+  function filtered(){
+    var q = $('q').value.trim().toLowerCase();
+    return notes.filter(function(n){ return !q || String(n.text).toLowerCase().indexOf(q) !== -1; });
+  }
+  function rowsHtml(list, withId){
+    if (!list.length) {
+      return '<tr><td colspan="3"><div class="empty"><b>No notes found</b>Add a note above to get started.</div></td></tr>';
     }
-    async function addNote() {
-      const text = document.getElementById('text').value;
-      await fetch('/api/notes', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text })
-      });
-      document.getElementById('text').value = '';
-      load();
-    }
-    load();
-  </script>
+    return list.map(function(n){
+      return '<tr><td>' + esc(n.text) + '</td><td class="when">' + ago(n.id) + '</td>' +
+        (withId ? '<td class="id">#' + String(n.id).slice(-6) + '</td>' : '') + '</tr>';
+    }).join('');
+  }
+  function render(){
+    var list = filtered().slice().reverse();
+    $('recent').innerHTML = rowsHtml(list.slice(0,5), false).replace('colspan="3"','colspan="2"');
+    $('all').innerHTML = rowsHtml(list, true);
+    $('count').textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
+    $('kTotal').textContent = notes.length;
+
+    var start = new Date(); start.setHours(0,0,0,0);
+    var today = notes.filter(function(n){ return n.id >= start.getTime(); }).length;
+    $('kToday').textContent = today;
+    $('kLast').textContent = notes.length ? 'Last note ' + ago(notes[notes.length-1].id).toLowerCase() : 'No notes yet';
+
+    // 8-hour chart
+    var now = new Date(), hours = [], i;
+    for (i = 7; i >= 0; i--) { var h = new Date(now); h.setMinutes(0,0,0); h.setHours(now.getHours() - i); hours.push(h.getTime()); }
+    var counts = hours.map(function(t){ return notes.filter(function(n){ return n.id >= t && n.id < t + 3600000; }).length; });
+    var max = Math.max.apply(null, counts.concat([1]));
+    $('bars').innerHTML = counts.map(function(c, k){
+      return '<div class="bar' + (c ? ' on' : '') + '" style="height:' + Math.max(3, (c/max)*100) + '%" title="' + c + ' notes"></div>';
+    }).join('');
+    $('barLabels').innerHTML = hours.map(function(t){ return '<span>' + new Date(t).getHours() + ':00</span>'; }).join('');
+  }
+
+  /* API */
+  function loadNotes(){
+    return fetch('/api/notes').then(function(r){ return r.json(); }).then(function(d){ notes = d; render(); })
+      .catch(function(){ toast('Could not load notes. Check that the server is running.'); });
+  }
+  var logLines = [];
+  function check(){
+    var t0 = performance.now();
+    return fetch('/api/health', {cache:'no-store'}).then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function(d){
+      var ms = Math.round(performance.now() - t0);
+      setStatus(true, ms, d);
+      pushLog('ok', 'GET /api/health  200  ' + ms + ' ms');
+    }).catch(function(e){
+      setStatus(false);
+      pushLog('bad', 'GET /api/health  failed  ' + e.message);
+    });
+  }
+  function setStatus(up, ms, d){
+    var pill = $('statusPill');
+    pill.className = 'pill ' + (up ? 'ok' : 'bad');
+    $('statusText').textContent = up ? 'All systems operational' : 'Server unreachable';
+    $('kStatus').textContent = up ? 'Online' : 'Offline';
+    $('kStatusSub').textContent = up ? 'Responding normally' : 'Not responding';
+    $('kLatency').textContent = up ? ms + ' ms' : '-';
+    $('hApi').textContent = up ? 'Healthy' : 'Down';
+    $('hTime').textContent = clock(new Date());
+    $('hSrv').textContent = up && d.time ? clock(new Date(d.time)) : '-';
+  }
+  function pushLog(cls, text){
+    logLines.unshift('<div class="' + cls + '">' + clock(new Date()) + '  ' + esc(text) + '</div>');
+    logLines = logLines.slice(0, 30);
+    $('log').innerHTML = logLines.join('');
+  }
+
+  $('addForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var input = $('text'), text = input.value.trim();
+    if (!text) return;
+    var btn = $('addBtn'); btn.disabled = true;
+    fetch('/api/notes', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text})
+    }).then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
+      .then(function(n){ notes.push(n); input.value = ''; render(); toast('Note added'); })
+      .catch(function(){ toast('Could not add the note. Try again.'); })
+      .then(function(){ btn.disabled = false; input.focus(); });
+  });
+
+  $('q').addEventListener('input', function(){ render(); if (!$('v-dashboard').hidden) show('notes'); });
+  $('recheck').addEventListener('click', check);
+
+  $('sHost').textContent = location.host;
+  $('sProto').textContent = location.protocol === 'https:' ? 'HTTPS (secure)' : 'HTTP (not encrypted)';
+
+  loadNotes(); check();
+  setInterval(check, 15000);
+  setInterval(render, 30000);
+})();
+</script>
 </body>
 </html>
