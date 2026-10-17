@@ -164,7 +164,7 @@ button,input{font:inherit;color:inherit}
       <section class="view" id="v-dashboard">
         <div class="kpis">
           <div class="kpi"><span>Server</span><strong id="kStatus">-</strong><small id="kStatusSub">Checking</small></div>
-          <div class="kpi"><span>Total notes</span><strong id="kTotal">0</strong><small>Since last restart</small></div>
+          <div class="kpi"><span>Total notes</span><strong id="kTotal">0</strong><small>Saved on the server</small></div>
           <div class="kpi"><span>Added today</span><strong id="kToday">0</strong><small id="kLast">No notes yet</small></div>
           <div class="kpi"><span>Response time</span><strong id="kLatency">-</strong><small>Health check</small></div>
         </div>
@@ -173,6 +173,7 @@ button,input{font:inherit;color:inherit}
           <div class="card">
             <div class="card-h"><h2>Quick add</h2></div>
             <form class="add" id="addForm">
+              <input id="author" type="text" placeholder="Your name" maxlength="40" aria-label="Your name" style="flex:0 0 150px">
               <input id="text" type="text" placeholder="Write a note" maxlength="200" aria-label="New note" required>
               <button class="btn" id="addBtn" type="submit">Add note</button>
             </form>
@@ -206,7 +207,7 @@ button,input{font:inherit;color:inherit}
           <div class="card-h"><h2>All notes</h2><span class="pill" id="count">0 notes</span></div>
           <div class="tbl-wrap">
             <table class="tbl">
-              <thead><tr><th>Note</th><th>Added</th><th>ID</th></tr></thead>
+              <thead><tr><th>Note</th><th>Added by</th><th>Added</th><th>ID</th></tr></thead>
               <tbody id="all"></tbody>
             </table>
           </div>
@@ -279,20 +280,20 @@ button,input{font:inherit;color:inherit}
   /* Rendering */
   function filtered(){
     var q = $('q').value.trim().toLowerCase();
-    return notes.filter(function(n){ return !q || String(n.text).toLowerCase().indexOf(q) !== -1; });
+    return notes.filter(function(n){ return !q || (String(n.text) + ' ' + String(n.author || '')).toLowerCase().indexOf(q) !== -1; });
   }
   function rowsHtml(list, withId){
     if (!list.length) {
-      return '<tr><td colspan="3"><div class="empty"><b>No notes found</b>Add a note above to get started.</div></td></tr>';
+      return '<tr><td colspan="4"><div class="empty"><b>No notes found</b>Add a note above to get started.</div></td></tr>';
     }
     return list.map(function(n){
-      return '<tr><td>' + esc(n.text) + '</td><td class="when">' + ago(n.id) + '</td>' +
+      return '<tr><td>' + esc(n.text) + '</td><td class="when">' + esc(n.author || 'Anonymous') + '</td><td class="when">' + ago(n.id) + '</td>' +
         (withId ? '<td class="id">#' + String(n.id).slice(-6) + '</td>' : '') + '</tr>';
     }).join('');
   }
   function render(){
     var list = filtered().slice().reverse();
-    $('recent').innerHTML = rowsHtml(list.slice(0,5), false).replace('colspan="3"','colspan="2"');
+    $('recent').innerHTML = rowsHtml(list.slice(0,5), false);
     $('all').innerHTML = rowsHtml(list, true);
     $('count').textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
     $('kTotal').textContent = notes.length;
@@ -356,10 +357,10 @@ button,input{font:inherit;color:inherit}
     if (!text) return;
     var btn = $('addBtn'); btn.disabled = true;
     fetch('/api/notes', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text})
-    }).then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text, author:$('author').value})
+    }).then(function(r){ return r.json().then(function(d){ if (!r.ok) throw new Error(d.error || 'Could not add the note.'); return d; }); })
       .then(function(n){ notes.push(n); input.value = ''; render(); toast('Note added'); })
-      .catch(function(){ toast('Could not add the note. Try again.'); })
+      .catch(function(e){ toast(e.message || 'Could not add the note. Try again.'); })
       .then(function(){ btn.disabled = false; input.focus(); });
   });
 
@@ -371,7 +372,7 @@ button,input{font:inherit;color:inherit}
 
   loadNotes(); check();
   setInterval(check, 15000);
-  setInterval(render, 30000);
+  setInterval(loadNotes, 10000);
 })();
 </script>
 </body>
